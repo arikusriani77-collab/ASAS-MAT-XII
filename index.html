@@ -69,14 +69,6 @@ table{width:100%;border-collapse:collapse}td,th{border:1px solid var(--bd);paddi
 .back{background:none;color:var(--pr);padding:0 0 6px;font-weight:600;border:0}
 @media(prefers-reduced-motion:reduce){.hero,#fl span,.cover,.cover *,.gbr *,.btn-mulai,.info,.rules,.mat{animation:none!important;opacity:1!important}}
 .err{color:var(--rd);font-size:.9rem;margin-top:8px}
-.fr{display:inline-block;vertical-align:middle;text-align:center;line-height:1.25;margin:0 3px}
-.fr>span{display:block;padding:0 4px}
-.fr>span:first-child{border-bottom:1.5px solid currentColor}
-.rt{white-space:nowrap}.ov{border-top:1.5px solid currentColor;padding:0 2px;margin-left:1px}
-sup,sub{line-height:0}
-.ef{display:inline-block;vertical-align:.6em;font-size:.72em;text-align:center;line-height:1.15;margin-left:1px}
-.ef>span{display:block;padding:0 2px}
-.ef>span:first-child{border-bottom:1.3px solid currentColor}
 </style>
 </head>
 <body>
@@ -86,11 +78,11 @@ sup,sub{line-height:0}
 <script>
 /* ================= PENGATURAN (ubah di sini) ================= */
 const CONFIG = {
-  SCRIPT_URL: "https://script.google.com/macros/s/AKfycbxDK4NKoUZXN7wcV3YyW30PZ6H1chfVfcv3otpyFe9uX4abrm2S3pKkeQwQqztqTSXX/exec",
+  SCRIPT_URL: "https://script.google.com/macros/s/AKfycbyHW0iesmGV88-iPvNmc1RSvMwNESvkCnvTNjtZR42cJgb6S4Nxggo0xfBoUwKJJDYiDQ/exec",
   JUDUL: "Asesmen Akhir Semester Ganjil",
   TAHUN: "2026/2027",
   MAPEL: "Matematika",
-  KELAS: "X",
+  KELAS: "XII",
   SEKOLAH: "SMAN 1 Ngamprah",
   GURU: "Ari Kusriani Iman, S.Pd.",
   JUMLAH_SOAL: 20,       // hanya tampilan; jumlah soal sebenarnya = isi fungsi buatSoal()
@@ -106,6 +98,7 @@ const rp = x => String(Math.round(x)).replace(/\B(?=(\d{3})+(?!\d))/g,".");
 const sum = a => a.reduce((s,x)=>s+x,0);
 const gcd = (a,b) => b?gcd(b,a%b):a;
 const fr = (n,d) => {const g=gcd(n,d);n/=g;d/=g;return d==1?String(n):n+"/"+d};   // pecahan paling sederhana
+const sb = n => String(n).replace(/\d/g,d=>"₀₁₂₃₄₅₆₇₈₉"[d]);   // angka subskrip untuk nPr / nCr
 const fact = n => n<=1?1:n*fact(n-1);
 const Pm = (n,r) => r>n?0:fact(n)/fact(n-r);
 const Cm = (n,r) => r>n?0:Pm(n,r)/fact(r);
@@ -113,103 +106,222 @@ const tb = (h,rows) => `<div style="overflow-x:auto;margin:8px 0"><table><tr>${h
 const tbh = rows => `<div style="overflow-x:auto;margin:8px 0"><table>${rows.map(r=>`<tr><th>${r[0]}</th>${r.slice(1).map(x=>`<td class="c">${x}</td>`).join("")}</tr>`).join("")}</table></div>`;
 
 /* Setiap siswa (dan tiap percobaan) mendapat angka berbeda: seluruh parameter diacak dari seed.
-   Soal 1–9   : BILANGAN (eksponen, bentuk akar, logaritma, persamaan eksponen/logaritma)
-   Soal 10–20 : BARISAN DAN DERET (aritmetika, geometri, tak hingga, bunga, pertumbuhan & peluruhan) */
+   Soal 1–10  : STATISTIKA (penyajian data, pemusatan data, penyebaran data)
+   Soal 11–20 : PELUANG    (pencacahan, permutasi, kombinasi, peluang kejadian, peluang majemuk) */
 function buatSoal(seed){
   const R=rng(seed),ri=(a,b)=>a+Math.floor(R()*(b-a+1)),pc=a=>a[Math.floor(R()*a.length)];
   const pick=(a,n)=>shuf(a,R).slice(0,n);
+  const komp=(k,n,mn=1)=>{const f=Array(k).fill(mn);for(let i=0;i<n-k*mn;i++)f[Math.floor(R()*k)]++;return f}; // k frekuensi berjumlah n
+  const kls=(lo0,p,k)=>Array.from({length:k},(_,i)=>[lo0+i*p,lo0+i*p+p-1]);
+  const rowsK=(K,f)=>K.map((c,i)=>[`${c[0]} – ${c[1]}`,f[i]]);
   const bol3=()=>{let f;do{f=[R()<.5,R()<.5,R()<.5].map(Number)}while(f[0]+f[1]+f[2]==0||f[0]+f[1]+f[2]==3);return f};
-  const SUP={"0":"⁰","1":"¹","2":"²","3":"³","4":"⁴","5":"⁵","6":"⁶","7":"⁷","8":"⁸","9":"⁹","-":"⁻"},
-    sp=n=>String(n).split("").map(c=>SUP[c]||c).join(""),
-    lg=(b,x)=>`<sup>${b}</sup>log ${x}`,ex=(b,e)=>`${b}<sup>${e}</sup>`,
-    mk=(c,d)=>{const u=[...new Set(d)].filter(x=>x!=c).slice(0,4);return [c,...u].map((t,i)=>({t:String(t),ok:i?0:1}))},
-    P=(c,d,f,st)=>pgo(c,d.filter(Number.isInteger),f,st),
-    fm=(n,d)=>(n<0?"−":"")+fz(Math.abs(n),d),fz=(n,d)=>`<span class="fr"><span>${n}</span><span>${d}</span></span>`,rt=x=>`<span class="rt">√<span class="ov">${x}</span></span>`,sr=(k,x)=>`${k}${rt(x)}`;
+  const bersih=r=>Math.abs(r*100-Math.round(r*100))<1e-7; // hasil maksimal 2 desimal
+  const KO=[[1,2,3],[1,3],[2,4],[4],[1,2,3,4]];
+  const lb=c=>c.length==4?"Semua pernyataan benar":c.length==1?`Hanya pernyataan (${c[0]}) yang benar`:c.length==2?`Pernyataan (${c[0]}) dan (${c[1]}) benar`:`Pernyataan (${c.slice(0,-1).join("), (")}), dan (${c[c.length-1]}) benar`;
+  const kmb=(tag,intro,mk)=>{const bn=pc([0,1,2,3,4]),T=new Set(KO[bn]),st=mk(j=>T.has(j));
+    return {type:"pg",fix:1,tag,q:intro+"<br>"+st.map((x,j)=>`(${j+1}) ${x}`).join("<br>")+"<br>Pernyataan yang benar adalah …",
+      o:KO.map((c,j)=>({t:`${"ABCDE"[j]}. ${lb(c)}`,ok:j==bn?1:0}))}};
+  const cnt2=k=>{let c=0;for(let i=1;i<=6;i++)for(let j=1;j<=6;j++)if(i+j==k)c++;return c}; // banyak pasangan dua dadu berjumlah k
   const S=[];
 
-  /* ---------- BILANGAN ---------- */
-  // 1. PG kompleks – sifat eksponen
-  {const A=x=>`a<sup>${x}</sup>`,
-    T=[`${A("m")} × ${A("n")} = ${A("m+n")}`,`(${A("m")})<sup>n</sup> = ${A("m×n")}`,`${A("−m")} = ${fz(1,A("m"))}, dengan a ≠ 0`,`${A(0)} = 1, dengan a ≠ 0`,`${fz(A("m"),A("n"))} = ${A("m−n")}, dengan a ≠ 0`,`(a × b)<sup>n</sup> = a<sup>n</sup> × b<sup>n</sup>`],
-    F=[`${A("m")} × ${A("n")} = ${A("m×n")}`,`(${A("m")})<sup>n</sup> = ${A("m+n")}`,`${A("−m")} = −${A("m")}`,`${A(0)} = 0`,`(a + b)<sup>n</sup> = ${A("n")} + b<sup>n</sup>`,`${fz(A("m"),A("n"))} = ${A("m÷n")}`];
-   S.push({type:"pk",tag:"Sifat Eksponen (Pilihan Ganda Kompleks)",q:"Pilih <b>semua</b> pernyataan yang <b>benar</b> tentang bilangan berpangkat (jawaban lebih dari satu).",o:[...pick(T,2).map(t=>({t,ok:1})),...pick(F,2).map(t=>({t,ok:0}))]});}
-  // 2. PG – menyederhanakan bentuk pangkat
-  {let B,a,b,c,e;do{B=pc([2,3]);a=ri(3,8);b=ri(1,4);c=ri(1,3);e=a+2*b-3*c}while(e<2||e>7);const v=B**e;
-   S.push({type:"pg",tag:"Sifat Eksponen (Menyederhanakan)",q:`Nilai dari ${fz(`${ex(B,a)} × ${ex(B*B,b)}`,ex(B**3,c))} adalah …`,o:P(v,[v*B,v/B,B**(a+b-c),B**(a+2*b-2*c),B**(e+2)])});}
-  // 3. PG – pangkat pecahan
-  {const [N,p,q]=pc([[27,2,3],[16,3,4],[8,4,3],[25,3,2],[32,2,5],[81,3,4],[64,2,3],[125,2,3],[4,3,2],[243,2,5],[1000,2,3],[16,3,2]]),
-    r0=Math.round(Math.pow(N,1/q)),v=r0**p;
-   S.push({type:"pg",tag:"Pangkat Pecahan",q:`Nilai dari ${N}<span class="ef"><span>${p}</span><span>${q}</span></span> adalah …`,o:P(v,[r0*p,r0**(p+1),r0**(p-1),r0+p,N*p,v+r0])});}
-  // 4. Benar / Salah – pangkat nol, pangkat negatif, bentuk akar
-  {const c=pc([2,3,5]),m=pc([2,3,5,6,7]),k=pc([2,3,4]),fl=bol3();
-   S.push({type:"bs",tag:"Eksponen dan Akar (Benar / Salah)",q:"Tentukan apakah setiap pernyataan berikut <b>Benar</b> atau <b>Salah</b>.",
-    o:[{t:fl[0]?`${ex(c,0)} = 1.`:`${ex(c,0)} = 0.`,ok:fl[0]},
-       {t:fl[1]?`${ex(c,"−2")} = ${fz(1,c*c)}.`:`${ex(c,"−2")} = −${c*c}.`,ok:fl[1]},
-       {t:fl[2]?`${rt(k*k*m)} = ${sr(k,m)}.`:`${rt(k*k*m)} = ${sr(k*k,m)}.`,ok:fl[2]}]});}
-  // 5. PG – penjumlahan/pengurangan bentuk akar
-  {const m=pc([2,3,5,6,7]);let a1,a2,a3,c,k;do{a1=ri(2,5);a2=ri(1,4);a3=ri(1,4);c=ri(2,3);k=a1+c*a2-a3}while(k<2);
-   S.push({type:"pg",tag:"Operasi Bentuk Akar (Sederhanakan)",q:`Bentuk paling sederhana dari ${rt(a1*a1*m)} + ${sr(c,a2*a2*m)} − ${rt(a3*a3*m)} adalah …`,o:P(k,[a1+c*a2+a3,a1+c*a2,k+1,k-1,k+2],x=>sr(x,m))});}
-  // 7. PG – merasionalkan penyebut
-  {const [a,b]=pc([[7,3],[5,3],[11,2],[7,2],[6,2],[10,5],[8,5],[13,3],[5,2],[7,5]]),d=a-b,k=ri(2,4),p=d*k;
-   S.push({type:"pg",tag:"Merasionalkan Penyebut",q:`Bentuk rasional dari ${fz(p,`${rt(a)} + ${rt(b)}`)} adalah …`,
-    o:mk(`${sr(k,a)} − ${sr(k,b)}`,[`${sr(k,a)} + ${sr(k,b)}`,`${sr(p,a)} − ${sr(p,b)}`,`${sr(d,a)} − ${sr(d,b)}`,`${sr(p,a)} + ${sr(p,b)}`,sr(k,d),sr(p,d)])});}
-  // 8. PG – sifat logaritma (jumlah dan selisih)
-  {const b=pc([2,3,5]),m=pc([2,3,5,7].filter(x=>x!=b)),i=ri(2,4),j=ri(1,3),h=ri(0,2),v=i+j-h;
-   S.push({type:"pg",tag:"Sifat-sifat Logaritma",q:`Nilai dari ${lg(b,b**i*m)} + ${lg(b,b**j)} − ${lg(b,m*b**h)} adalah …`,o:P(v,[i+j,i+j+h,i*j,i+h,v+1,v+2])});}
-  // 9. PG – logaritma dinyatakan dalam p dan q
-  {const L=[[12,"2 + p"],[18,"1 + 2p"],[20,"2 + q"],[30,"1 + p + q"],[45,"2p + q"],[75,"p + 2q"],[90,"1 + 2p + q"],[150,"1 + p + 2q"]],[N,ans]=pc(L);
-   S.push({type:"pg",tag:"Logaritma dalam p dan q",q:`Diketahui ${lg(2,3)} = p dan ${lg(2,5)} = q. Nilai ${lg(2,N)} dinyatakan dalam p dan q adalah …`,o:mk(ans,shuf(L.map(x=>x[1]),R))});}
-  // 10. Isian – persamaan eksponen atau logaritma sederhana
-  if(R()<.5){const B=pc([2,3]),dd=pc([1,2]),m=ri(1,3),s=m+dd,x=ri(2,5),p=dd*x;
-   S.push({type:"pg",tag:"Persamaan Eksponen",q:`Nilai x yang memenuhi persamaan ${ex(B,(m==1?"":m)+"x + "+p)} = ${ex(B**s,"x")} adalah …`,o:P(x,[x+1,x-1,p,m*x,p+dd,x+2])});}
-  else{const c=pc([2,3,5]),n=c==2?ri(3,5):c==3?ri(2,3):2,a=ri(1,4);
-   S.push({type:"pg",tag:"Persamaan Logaritma",q:`Nilai x yang memenuhi persamaan ${lg(c,"(x + "+a+")")} = ${n} adalah …`,o:P(c**n-a,[c*n-a,c**n,c**n+a,c**n-a+1,c**n-a-1,c**n-a+2])});}
+  /* ---------- STATISTIKA ---------- */
+  // 1. Pilihan ganda kompleks – penyajian data (diagram, histogram, poligon, ogive, tepi kelas)
+  {const Tr=["Diagram garis digunakan untuk menggambarkan keadaan yang berlangsung secara kontinu, misalnya perkembangan jumlah penjualan dari waktu ke waktu.",
+     "Pada diagram lingkaran, besar sudut juring = (frekuensi data ÷ jumlah seluruh data) × 360°.",
+     "Poligon frekuensi dibuat dengan menghubungkan titik-titik yang absisnya titik tengah kelas dan ordinatnya frekuensi kelas.",
+     "Ogive positif (kurang dari) dibuat dengan tepi atas kelas sebagai absis dan frekuensi kumulatif kurang dari sebagai ordinat.",
+     "Pada histogram, alas setiap persegi panjang menunjukkan panjang kelas dan tingginya menunjukkan frekuensi kelas.",
+     "Untuk data bulat, tepi bawah suatu kelas diperoleh dengan mengurangkan 0,5 dari batas bawah kelas tersebut."],
+    Fl=["Pada histogram, tinggi setiap persegi panjang menunjukkan panjang kelas.",
+     "Poligon frekuensi dibuat dengan menghubungkan tepi atas setiap kelas dengan frekuensinya.",
+     "Ogive negatif (lebih dari) dibuat dengan tepi atas kelas sebagai absis dan frekuensi kumulatif kurang dari sebagai ordinat.",
+     "Jumlah besar seluruh sudut juring pada diagram lingkaran adalah 180°.",
+     "Histogram adalah diagram garis yang khusus digunakan untuk menyajikan data tunggal.",
+     "Untuk data bulat, tepi atas suatu kelas sama dengan batas atas kelas tersebut."];
+   S.push({type:"pk",tag:"Penyajian Data (Pilihan Ganda Kompleks)",
+    q:"Pilih <b>semua</b> pernyataan yang <b>benar</b> tentang penyajian data (jawaban lebih dari satu).",
+    o:[...pick(Tr,2).map(t=>({t,ok:1})),...pick(Fl,2).map(t=>({t,ok:0}))]});}
+  // 2. Benar / Salah – mean, median, modus dari tabel frekuensi (data tunggal)
+  {const V=[5,6,7,8,9,10];let f;do{f=komp(6,20)}while(f.filter(x=>x==Math.max(...f)).length>1);
+   const e=V.flatMap((v,i)=>Array(f[i]).fill(v)),mean=sum(e)/20,med=(e[9]+e[10])/2,mo=V[f.indexOf(Math.max(...f))],fl=bol3(),
+    wm=mean+pc([.3,.5])*(mean<8?1:-1),wd=med+(med<8?1:-1),wo=pick(V.filter(v=>v!=mo),1)[0];
+   S.push({type:"bs",tag:"Mean, Median, Modus (Benar / Salah)",
+    q:`Nilai ujian suatu mata pelajaran dari 20 siswa disajikan pada tabel berikut.${tbh([["Nilai",...V],["Frekuensi",...f]])}Tentukan apakah setiap pernyataan berikut <b>Benar</b> atau <b>Salah</b>.`,
+    o:[{t:`Rata-rata (mean) nilai tersebut adalah ${dc(fl[0]?mean:wm)}.`,ok:fl[0]},
+       {t:`Median data tersebut adalah ${dc(fl[1]?med:wd)}.`,ok:fl[1]},
+       {t:`Modus data tersebut adalah ${fl[2]?mo:wo}.`,ok:fl[2]}]});}
+  // 3. PG pernyataan – rata-rata gabungan
+  {const C=pc([{a:"siswa putra",b:"siswa putri",t:"tinggi badan",u:" cm",lo:155,hi:176},{a:"siswa kelas XII-A",b:"siswa kelas XII-B",t:"nilai ulangan matematika",u:"",lo:60,hi:90}]);
+   let n1=30,n2=10,P=170,W=166,G=169;
+   for(let t=0;t<800;t++){const a=pc([20,24,30,36,18]),b=pc([10,12,15,8,6]),x=ri(C.lo,C.hi),y=ri(C.lo,C.hi),g=(x*a+y*b)/(a+b);
+     if(Number.isInteger(g)&&x!=y&&g!=x&&g!=y){n1=a;n2=b;P=x;W=y;G=g;break}}
+   S.push(kmb("Rata-rata Gabungan (Pernyataan)",
+    `Dalam suatu kelas terdapat ${n1} ${C.a} dan ${n2} ${C.b}. Rata-rata ${C.t} ${C.a} adalah ${P}${C.u}, rata-rata ${C.t} ${C.b} adalah ${W}${C.u}, dan rata-rata ${C.t} seluruh siswa adalah ${G}${C.u}. Perhatikan pernyataan-pernyataan berikut!`,
+    T=>[`Jumlah ${C.t} seluruh ${C.a} adalah ${T(1)?n1*P:n2*P}${C.u}.`,
+        `Jumlah ${C.t} seluruh siswa adalah ${T(2)?G*(n1+n2):G*(n1+n2)+10}${C.u}.`,
+        `Rata-rata ${C.t} ${C.b} dapat dihitung dengan rumus (${n1+n2} × ${G} − ${n1} × ${P}) ÷ ${n2} = ${T(3)?W:W+pc([-2,2])}${C.u}.`,
+        T(4)?`Rata-rata seluruh siswa (${G}${C.u}) lebih dekat ke rata-rata ${C.a} karena anggotanya lebih banyak.`:`Rata-rata seluruh siswa sama dengan rata-rata biasa kedua kelompok, yaitu ${dc((P+W)/2)}${C.u}.`]))}
+  // 4. PG – mean data berkelompok (panjang kelas ganjil sehingga titik tengah kelas bilangan bulat)
+  {const p=pc([3,5,7,9]),h=(p-1)/2,n=pc([20,25,50]),K=kls(ri(25,55),p,5),mid=K.map(c=>c[0]+h),f=komp(5,n),mean=sum(f.map((x,i)=>x*mid[i]))/n;
+   S.push({type:"pg",tag:"Mean Data Berkelompok",
+    q:`Perhatikan tabel distribusi frekuensi berikut!${tb(["Nilai","Frekuensi"],rowsK(K,f))}Rata-rata (mean) data tersebut adalah …`,
+    o:pgo(mean,[mean-h,mean+h,Math.round(sum(mid)/5),mean+1,mean-1],x=>dc(x),.5)});}
+  // 5. PG – median data berkelompok
+  {const p=pc([5,10]),k=pc([5,6]);let K,f,n,i,F,Tb,r;
+   for(let t=0;t<5000;t++){K=kls(p==5?pc([30,35,40,45,50]):pc([30,40,50]),p,k);f=Array.from({length:k},()=>ri(2,14));n=sum(f);if(n%2)continue;
+     let c=0;i=0;while(c+f[i]<n/2)c+=f[i++];F=c;Tb=K[i][0]-.5;r=(n/2-F)/f[i]*p;if(bersih(r))break}
+   const Me=Tb+r;
+   S.push({type:"pg",tag:"Median Data Berkelompok",
+    q:`Perhatikan tabel distribusi frekuensi berikut!${tb(["Nilai","Frekuensi"],rowsK(K,f))}Median data tersebut adalah …`,
+    o:pgo(Me,[Tb+n/2/f[i]*p,K[i][1]+.5+r,K[i][0]+r,Tb-r,Tb+(n/2-F)/f[i]],x=>dc(x),.5)});}
+  // 6. PG – modus data berkelompok
+  {const p=pc([5,10]),k=pc([5,6]);let K,f,m,b1,b2,r;
+   for(let t=0;t<5000;t++){K=kls(p==5?pc([30,35,40,45,50]):pc([30,40,50]),p,k);f=Array.from({length:k},()=>ri(2,16));
+     const mx=Math.max(...f);m=f.indexOf(mx);if(f.filter(x=>x==mx).length>1||m==0||m==k-1)continue;
+     b1=f[m]-f[m-1];b2=f[m]-f[m+1];r=b1/(b1+b2)*p;if(bersih(r))break}
+   const Tb=K[m][0]-.5,Mo=Tb+r;
+   S.push({type:"pg",tag:"Modus Data Berkelompok",
+    q:`Perhatikan tabel distribusi frekuensi berikut!${tb(["Nilai","Frekuensi"],rowsK(K,f))}Modus data tersebut adalah …`,
+    o:pgo(Mo,[Tb+b2/(b1+b2)*p,K[m][0]+r,Tb+b1/(b1+b2),Tb+p/2,K[m][1]+.5+r],x=>dc(x),.5)});}
+  // 7. PG – kuartil / desil / persentil data berkelompok
+  {const M=pc([["kuartil bawah (Q₁)",1,4],["kuartil atas (Q₃)",3,4],["desil ke-2 (D₂)",2,10],["desil ke-8 (D₈)",8,10],["persentil ke-40 (P₄₀)",40,100],["persentil ke-70 (P₇₀)",70,100]]);
+   let p,K,f,n,pos,c,ix,F,Tb,r;
+   for(let t=0;t<20000;t++){p=pc([5,9]);K=kls(pc([20,26,31,36,40]),p,pc([5,6]));f=K.map(()=>ri(3,20));n=sum(f);pos=M[1]*n/M[2];
+     c=0;ix=0;while(c+f[ix]<pos)c+=f[ix++];F=c;Tb=K[ix][0]-.5;r=(pos-F)/f[ix]*p;if(bersih(r)&&r>0)break}
+   S.push({type:"pg",tag:"Kuartil, Desil, Persentil",
+    q:`Perhatikan tabel distribusi frekuensi berikut!${tb(["Ukuran","Frekuensi"],rowsK(K,f))}Nilai ${M[0]} dari data tersebut adalah …`,
+    o:pgo(Tb+r,[Tb+pos/f[ix]*p,K[ix][1]+.5+r,K[ix][0]+r,Tb-r,Tb+(pos-F)/f[ix]],x=>dc(x),.5)});}
+  // 8. PG pernyataan – jangkauan, kuartil, simpangan kuartil data tunggal
+  {let n,s,Q1,Q3,v;
+   do{n=pc([11,15,19]);s=Array.from({length:n},()=>ri(3,15)).sort((a,b)=>a-b);Q1=s[(n+1)/4-1];Q3=s[3*(n+1)/4-1]}while(Q3<=Q1);
+   v=shuf(s,R);const JR=s[n-1]-s[0];
+   S.push(kmb("Kuartil Data Tunggal (Pernyataan)",
+    `Diketahui data: ${v.join(", ")}. Letak kuartil ke-i pada data yang telah diurutkan adalah data ke-i(n + 1)/4. Perhatikan pernyataan-pernyataan berikut!`,
+    T=>[`Jangkauan data tersebut adalah ${T(1)?JR:JR+pc([-1,1,2])}.`,
+        `Kuartil bawah (Q₁) data tersebut adalah ${T(2)?Q1:Q1+pc([-1,1])}.`,
+        `Kuartil atas (Q₃) data tersebut adalah ${T(3)?Q3:Q3+pc([-1,1])}.`,
+        `Simpangan kuartil data tersebut adalah ${T(4)?dc((Q3-Q1)/2):dc(Q3-Q1)}.`]))}
+  // 9 & 10. PG – simpangan rata-rata dan simpangan baku (rata-rata data bilangan bulat)
+  const simp=sb=>{const n=pc([5,6,8]),m=ri(20,70);let d,ss,sm,ok=false;
+   for(let t=0;t<200000&&!ok;t++){d=Array.from({length:n-1},()=>ri(-6,6));d.push(-sum(d));if(Math.abs(d[n-1])>7)continue;
+     ss=sum(d.map(x=>x*x));sm=sum(d.map(Math.abs));
+     if(sb){const q=Math.sqrt(ss/n);if(q>0&&Number.isInteger(q))ok=true}else if(bersih(sm/n)&&sm>0&&new Set(d).size>2)ok=true}
+   const v=shuf(d.map(x=>m+x),R).join(", ");
+   if(sb){const q=Math.sqrt(ss/n);
+     S.push({type:"pg",tag:"Simpangan Baku",q:`Simpangan baku dari data ${v} adalah …`,
+      o:pgo(q,[ss/n,Math.sqrt(ss/(n-1)),q+1,q-1,sm/n],x=>dc(x),1)})}
+   else{const q=sm/n;
+     S.push({type:"pg",tag:"Simpangan Rata-rata",q:`Simpangan rata-rata dari data ${v} adalah …`,
+      o:pgo(q,[sm/(n-1),q+1,q-1,q*2,q+.5],x=>dc(x),.5)})}};
+  simp(false); simp(true);
 
-  /* ---------- BARISAN DAN DERET ---------- */
-  // 11. PG – suku ke-n barisan aritmetika
-  {const a=pc([2,3,4,5,6,7]),b=ri(2,6),n=ri(12,25),c=a+(n-1)*b;
-   S.push({type:"pg",tag:"Barisan Aritmetika",q:`Diketahui barisan aritmetika ${a}, ${a+b}, ${a+2*b}, … Suku ke-${n} barisan tersebut adalah …`,o:P(c,[a+n*b,c+b,c-b,a+(n-2)*b,n*b])});}
-  // 12. PG kompleks – mengenali barisan aritmetika
-  {const ar=(a,b)=>[0,1,2,3].map(i=>num(a+i*b)).join(", ")+", …",ge=(a,r)=>[0,1,2,3].map(i=>num(a*r**i)).join(", ")+", …";
-   S.push({type:"pk",tag:"Barisan Aritmetika dan Geometri (Pilihan Ganda Kompleks)",q:"Pilih <b>semua</b> barisan yang merupakan <b>barisan aritmetika</b> (jawaban lebih dari satu).",
-    o:[{t:ar(ri(1,9),pc([3,4,5])),ok:1},{t:ar(ri(10,20),pc([-2,-3,6,7])),ok:1},{t:ge(pc([1,2,3]),pc([2,3])),ok:0},{t:ge(pc([2,4,5]),pc([-2,-3])),ok:0}]});}
-  // 13. Isian – jumlah n suku pertama dari dua suku yang diketahui
-  {const a=ri(2,9),b=ri(2,6),p=pc([3,4,5]),q=p+pc([2,3]),n=pc([10,12,14,16,20]),v=n*(2*a+(n-1)*b)/2;
-   S.push({type:"pg",tag:"Deret Aritmetika",q:`Pada suatu deret aritmetika, suku ke-${p} adalah ${a+(p-1)*b} dan suku ke-${q} adalah ${a+(q-1)*b}. Jumlah ${n} suku pertama deret tersebut adalah …`,o:P(v,[n*(a+(n-1)*b),n*(2*a+n*b)/2,v+n,v-n,v+b,n*a+b])});}
-  // 14. PG – suku ke-n barisan geometri
-  {const a=ri(2,5),r=pc([2,3]),n=pc([5,6,7]),c=a*r**(n-1);
-   S.push({type:"pg",tag:"Barisan Geometri",q:`Diketahui barisan geometri ${a}, ${a*r}, ${a*r*r}, … Suku ke-${n} barisan tersebut adalah …`,o:P(c,[a*r**n,(a*r)**(n-1),a*r**(n-2),a*r*(n-1),a+(n-1)*r])});}
-  // 15. PG – jumlah deret geometri dari dua suku
-  {const a=ri(1,4),r=pc([2,3]),S6=a*(r**6-1)/(r-1);
-   S.push({type:"pg",tag:"Deret Geometri",q:`Pada suatu deret geometri, suku ke-3 adalah ${a*r*r} dan suku ke-6 adalah ${a*r**5}. Jumlah 6 suku pertama deret tersebut adalah …`,o:P(S6,[a*(r**5-1)/(r-1),a*(r**7-1)/(r-1),a*r**6,S6+a,S6-a])});}
-  // 16. Benar / Salah – deret geometri tak hingga
-  {const a=pc([36,72]),[n,d]=pc([[1,2],[1,3],[2,3]]),Sv=a*d/(d-n),t=[a,a*n/d,a*n*n/(d*d)],g=pc([2,3]),fl=bol3();
-   S.push({type:"bs",tag:"Barisan dan Deret Tak Hingga (Benar / Salah)",q:"Tentukan apakah setiap pernyataan berikut <b>Benar</b> atau <b>Salah</b>.",
-    o:[{t:`Jumlah deret geometri tak hingga ${t.join(" + ")} + … adalah ${fl[0]?Sv:Sv+pc([6,12])}.`,ok:fl[0]},
-       {t:`Barisan 5, ${5*g}, ${5*g*g}, … adalah barisan geometri ${fl[1]?"naik":"turun"} dengan rasio ${g}.`,ok:fl[1]},
-       {t:fl[2]?`Deret geometri tak hingga dengan rasio −${fz(1,2)} mempunyai jumlah karena −1 < r < 1.`:"Deret geometri tak hingga dengan rasio 2 mempunyai jumlah karena r > 1.",ok:fl[2]}]});}
-  // 17. PG – jumlah deret geometri tak hingga
-  {const a=pc([12,24,36,48]),[n,d]=pc([[1,2],[1,3],[2,3],[-1,2],[1,4],[3,4],[-1,3]]),v=a*d/(d-n);
-   S.push({type:"pg",tag:"Jumlah Deret Geometri Tak Hingga",q:`Jumlah deret geometri tak hingga dengan suku pertama ${a} dan rasio ${fm(n,d)} adalah …`,o:P(v,[a*2,v+a,a*d/(d+n),v*2,v-a,a+v/2])});}
-  // 18. PG – panjang lintasan bola
-  {const h=pc([6,12,18,24]),[n,d]=pc([[1,2],[1,3],[2,3],[3,4],[3,5],[1,4]]),k=(d+n)/(d-n),v=h*k;
-   S.push({type:"pg",tag:"Penerapan Deret Tak Hingga (Bola Memantul)",q:`Sebuah bola dijatuhkan dari ketinggian ${h} m ke lantai. Setiap kali memantul, bola mencapai ${fz(n,d)} kali tinggi sebelumnya. Panjang lintasan bola (naik dan turun) sampai berhenti adalah … m.`,o:P(v,[h*d/(d-n),2*h*d/(d-n),v+h,v-h,2*v])});}
-  // 19. Isian – bunga tunggal
-  {const M=pc([2,4,5])*1e6,r=pc([4,6,8,12]),p=pc([3,6]),t=pc([2,3,4]);
-   S.push({type:"pg",tag:"Bunga Tunggal",q:`Rani menabung Rp${rp(M)},00 di bank dengan bunga tunggal ${r}% per tahun yang dibayarkan setiap ${p} bulan. Saldo tabungan Rani pada akhir tahun ke-${t} adalah …`,o:P(Math.round(M*(100+r*t)/100),[Math.round(M*(1+r/100)**t),M*r*t/100,Math.round(M*(100+r)/100),Math.round(M*(100+r*(t+1))/100),Math.round(M*(100+r*(t-1))/100)],x=>"Rp"+rp(x),M/100)});}
-  // 20. PG – bunga majemuk (semua siswa)  +  21. pertumbuhan ATAU peluruhan (acak per siswa)
-  {const dm=x=>String(Math.round(x*1e8)/1e8).replace(".",","),
-    mkq=(q,u,M,r,n,sg)=>{const f=1+sg*r/100,R$=x=>u+rp(Math.round(x)),t=([b,e])=>`(${dm(b)})<sup>${e}</sup> = ${dm(b**e)}`;
-      return {q:q+`<br><i>Catatan:</i><br>${shuf([[f,n],[1-sg*r/100,n],[f,n+1]].map(t),R).join("<br>")}`,
-        o:mk(R$(M*f**n),[R$(M*(1-sg*r/100)**n),R$(M*(1+sg*2*r/100)**n),R$(M*f**(n-1)),R$(M*f**(n+1))])}};
-   {const M=pc([5,10,20,40])*1e6,r=pc([5,10,20,25]),n=pc([2,3]);
-    S.push({type:"pg",tag:"Bunga Majemuk",...mkq(`Modal Rp${rp(M)},00 diinvestasikan dengan bunga majemuk ${r}% per tahun. Besar modal pada akhir tahun ke-${n} adalah …`,"Rp",M,r,n,1)});}
-   {const r=pc([5,10,20,25]),n=pc([2,3]);
-    if(R()<.5){const N=pc([8,16,24,32])*1000;
-     S.push({type:"pg",tag:"Pertumbuhan",...mkq(`Jumlah penduduk suatu desa saat ini ${rp(N)} jiwa dan bertambah ${r}% setiap tahun dari jumlah tahun sebelumnya. Jumlah penduduk desa tersebut setelah ${n} tahun adalah … jiwa.`,"",N,r,n,1)});}
-    else{const M=pc([5,10,20,40])*1e6;
-     S.push({type:"pg",tag:"Peluruhan",...mkq(`Harga sebuah mesin Rp${rp(M)},00 menyusut ${r}% setiap tahun dari harga tahun sebelumnya. Harga mesin setelah ${n} tahun adalah …`,"Rp",M,r,n,-1)});}}}
-
+  /* ---------- PELUANG ---------- */
+  // 11. PG – kaidah pencacahan (penjumlahan, perkalian, bilangan dari angka-angka)
+  {const v=ri(0,4);let q,ans,d;
+   if(v==0){let D;do{D=pick([1,2,3,4,5,6,7,8,9],6)}while(D.filter(x=>x%2).length<2||D.filter(x=>x%2==0).length<2);
+     const o=D.filter(x=>x%2).length,e=6-o;ans=o*20;D=[...D].sort((a,b)=>a-b);
+     q=`Dari angka-angka ${D.join(", ")} akan dibuat bilangan yang terdiri dari tiga angka berlainan. Banyak bilangan <b>ganjil</b> yang dapat dibuat adalah …`;
+     d=[e*20,120,o*30,o*e*4,o*25]}
+   else if(v==1){let D,L,c;do{D=pick([1,2,3,4,5,6,7,8,9],6);L=pc([3,4,5,6,7]);c=D.filter(x=>x<L).length}while(c<2||c>4);
+     ans=c*20;D=[...D].sort((a,b)=>a-b);
+     q=`Dari angka-angka ${D.join(", ")} akan dibuat bilangan yang terdiri dari tiga angka berlainan. Banyak bilangan yang <b>lebih kecil dari ${L}00</b> adalah …`;
+     d=[(c+1)*20,120,c*30,c*36,c*25]}
+   else if(v==2){const [a,b,c]=pick([3,4,5,6,7,8],3);ans=a+b+c;
+     q=`Di rumah Anita terdapat ${a} jenis sepeda, ${b} jenis sepeda motor, dan ${c} jenis mobil yang berbeda. Jika Anita ingin berpergian dengan salah satu kendaraan tersebut, banyak pilihan kendaraan yang dapat digunakan adalah …`;
+     d=[a*b*c,a*b+c,a+b*c,(a+b)*c,ans+2]}
+   else if(v==3){const [a,b,c]=pick([2,3,4,5,6],3);ans=a*b*c;
+     q=`Seorang anak memiliki ${a} buah kaos, ${b} buah celana, dan ${c} pasang sepatu yang berbeda. Banyak kemungkinan pakaian lengkap (kaos, celana, dan sepatu) yang dapat dipasangkan adalah …`;
+     d=[a+b+c,a*b,a*b+c,(a+b)*c,ans+a]}
+   else{const a=ri(5,8),b=ri(3,5);ans=a*b*(b-1)*(a-1);
+     q=`Ada ${a} jalan yang menghubungkan kota A dengan kota B dan ${b} jalan yang menghubungkan kota B dengan kota C. Banyak cara seseorang pergi dari kota A ke kota B dilanjutkan ke kota C, kemudian kembali lagi ke kota A melalui kota B, jika ia tidak menggunakan jalan yang sama lebih dari satu kali adalah …`;
+     d=[a*a*b*b,a*b*2,a*b,a*b*b*a-a*b,(a+b)*2]}
+   S.push({type:"pg",tag:"Kaidah Pencacahan",q,o:pgo(ans,d,rp,5)});}
+  // 12. PG – permutasi (r unsur dari n unsur, unsur sama, siklis)
+  {const v=ri(0,2);let q,ans,d,tg;
+   if(v==0){const n=ri(6,10);ans=Pm(n,3);tg="Permutasi";
+     q=`Untuk menjabat pengurus suatu organisasi diperlukan 3 orang, yaitu ketua, sekretaris, dan bendahara. Tersedia ${n} calon. Banyak susunan pengurus yang mungkin adalah …`;
+     d=[Cm(n,3),n*3,n*n*n,n*(n-1),fact(n)/2]}
+   else if(v==1){const w=pc(["KALKULUS","KURIKULUM","MATEMATIKA","STATISTIKA","SEMESTER","BANANA","MISSISSIPPI"]),cn={};
+     [...w].forEach(c=>cn[c]=(cn[c]||0)+1);const n=w.length;ans=fact(n)/Object.values(cn).reduce((s,x)=>s*fact(x),1);tg="Permutasi Unsur Sama";
+     q=`Banyak susunan huruf yang berbeda yang dapat dibuat dari huruf-huruf pada kata “${w}” adalah …`;
+     d=[fact(n),fact(n-1),ans*2,Math.round(ans/2),fact(n)/Math.max(...Object.values(cn))]}
+   else{const k=ri(5,8);ans=fact(k-1);tg="Permutasi Siklis";
+     q=`Suatu keluarga yang terdiri dari ${k} orang duduk mengelilingi sebuah meja makan berbentuk lingkaran. Banyak cara duduk yang berbeda adalah …`;
+     d=[fact(k),fact(k-2),k*(k-1),Math.round(fact(k-1)/2),ans+k]}
+   S.push({type:"pg",tag:tg,q,o:pgo(ans,d,rp,5)});}
+  // 13. PG – kombinasi
+  {const v=ri(0,2);let q,ans,d;
+   if(v==0){const n=ri(5,8),m=ri(4,6),a=ri(2,3),b=ri(2,3);ans=Cm(n,a)*Cm(m,b);
+     q=`Suatu organisasi terdiri dari ${n} orang pria dan ${m} orang wanita. Akan dipilih ${a+b} orang yang terdiri dari ${a} pria dan ${b} wanita untuk mengikuti suatu kegiatan. Banyak kemungkinan susunan yang terpilih adalah …`;
+     d=[Pm(n,a)*Pm(m,b),Cm(n+m,a+b),Cm(n,a)+Cm(m,b),Cm(n,b)*Cm(m,a),Cm(n,a)*Cm(m,b)+n]}
+   else if(v==1){const n=ri(6,12);ans=Cm(n,2);
+     q=`Ada ${n} orang dalam suatu ruangan yang belum saling mengenal. Jika setiap orang berjabat tangan tepat satu kali dengan setiap orang lainnya, banyak jabat tangan yang terjadi adalah …`;
+     d=[n*(n-1),n*n,Cm(n,3),ans+n,ans-1]}
+   else{const N=ri(10,12),K=ri(6,8);ans=Cm(N-3,K-3);
+     q=`Seorang guru memberikan ${N} soal. Siswa diminta mengerjakan ${K} soal dengan syarat soal nomor 1, 2, dan 3 wajib dikerjakan. Banyak pilihan susunan soal yang dapat dikerjakan siswa adalah …`;
+     d=[Cm(N,K),Cm(N-3,K),Cm(N,K-3),Cm(N-3,K-3)+Cm(N-3,K-2),Pm(N-3,K-3)]}
+   S.push({type:"pg",tag:"Kombinasi",q,o:pgo(ans,d,rp,5)});}
+  // 14. Benar / Salah – faktorial, permutasi, kombinasi
+  {const fl=bol3(),n=ri(7,10),a=ri(6,9),b=ri(2,3),c=ri(6,10),d=ri(2,4);
+   S.push({type:"bs",tag:"Faktorial, Permutasi, Kombinasi (Benar / Salah)",
+    q:"Tentukan apakah setiap pernyataan berikut <b>Benar</b> atau <b>Salah</b>.",
+    o:[{t:`${n}! ÷ ${n-2}! = ${rp(fl[0]?n*(n-1):Cm(n,2))}`,ok:fl[0]},
+       {t:`${sb(a)}P${sb(b)} = ${rp(fl[1]?Pm(a,b):Cm(a,b))}`,ok:fl[1]},
+       {t:`${sb(c)}C${sb(d)} = ${rp(fl[2]?Cm(c,d):Pm(c,d))}`,ok:fl[2]}]});}
+  // 15. PG – ruang sampel dan peluang suatu kejadian
+  {const v=ri(0,2);let q,cn,tt;
+   if(v==0){const md=pc(["paling sedikit","tepat"]),k=ri(1,3);tt=8;cn=0;
+     for(let m=0;m<8;m++){const b=(m&1)+((m>>1)&1)+((m>>2)&1);if(md=="tepat"?b==k:b>=k)cn++}
+     q=`Tiga buah koin dilempar bersama-sama. Peluang munculnya ${md} ${k} sisi angka adalah …`}
+   else if(v==1){const t=pc([0,1,2]);tt=36;
+     if(t==0){const k=pc([4,5,6,8,9,10]);cn=cnt2(k);q=`Dua buah dadu dilempar bersama-sama. Peluang munculnya mata dadu yang berjumlah ${k} adalah …`}
+     else if(t==1){const k=ri(5,8);cn=0;for(let i=2;i<k;i++)cn+=cnt2(i);q=`Dua buah dadu dilempar bersama-sama. Peluang munculnya mata dadu yang berjumlah kurang dari ${k} adalah …`}
+     else{cn=6;q=`Dua buah dadu dilempar bersama-sama. Peluang munculnya kedua mata dadu yang sama adalah …`}}
+   else{const E=pc([["ganjil",3],["prima",3],["kelipatan 3",2],["lebih dari 4",2],["faktor dari 6",4],["kurang dari 3",2]]);tt=6;cn=E[1];
+     q=`Pada pelemparan sebuah dadu, peluang munculnya mata dadu ${E[0]} adalah …`}
+   S.push({type:"pg",tag:"Ruang Sampel dan Peluang",q,o:pgf(cn,tt)});}
+  // 16. PG – peluang komplemen atau frekuensi harapan
+  {if(R()<.5){const p=pc([.25,.3,.35,.4,.45,.55,.6,.65,.7,.75,.8,.85]),
+      C=pc([["Dalam suatu pertandingan catur antara Andi dan Budi, peluang Andi menang adalah","peluang Budi menang (tidak ada hasil seri) adalah"],
+            ["Peluang seorang siswa lulus ujian praktik adalah","peluang siswa tersebut tidak lulus ujian praktik adalah"],
+            ["Peluang hari ini turun hujan adalah","peluang hari ini tidak turun hujan adalah"]]);
+    S.push({type:"pg",tag:"Peluang Komplemen",q:`${C[0]} ${dc(p)}. Dengan demikian ${C[1]} …`,
+      o:pgo(1-p,[p,1-p/2,p+.1,p/2,1-p-.1,Math.abs(1-p-.2)],x=>dc(x),.05)})}
+   else{const N=pc([60,120,180,240,300,360,480,600]),E=pc([["genap",3],["prima",3],["kelipatan 3",2],["lebih dari 4",2],["faktor dari 6",4],["kurang dari 3",2]]),cn=E[1],ans=N*cn/6;
+    S.push({type:"pg",tag:"Frekuensi Harapan",q:`Sebuah dadu dilempar sebanyak ${N} kali. Frekuensi harapan munculnya mata dadu ${E[0]} adalah … kali.`,
+      o:pgo(ans,[N*(6-cn)/6,N/6,N/cn,ans*2,ans+N/12,ans/2],rp,10)})}}
+  // 17. PG – peluang gabungan dua kejadian saling lepas
+  {let q,cn,tt,ds;
+   if(R()<.5){const [a,b]=pick([2,3,4,5,6,8,9,10,11,12],2),ca=cnt2(a),cb=cnt2(b);cn=ca+cb;tt=36;
+     q=`Dua buah dadu dilempar bersama-sama. Peluang munculnya mata dadu yang berjumlah ${a} atau ${b} adalah …`;ds=[[ca,36],[cb,36],[ca*cb,36],[cn,18]]}
+   else{const [r,b,h]=pick([3,4,5,6,7,8,9],3),[c1,c2,c3]=pc([["merah","biru","hijau"],["putih","kuning","hitam"]]);tt=r+b+h;cn=r+b;
+     q=`Dalam sebuah kantong terdapat ${r} bola ${c1}, ${b} bola ${c2}, dan ${h} bola ${c3}. Jika diambil sebuah bola secara acak, peluang terambilnya bola ${c1} atau bola ${c2} adalah …`;ds=[[r,tt],[b,tt],[h,tt],[r*b,tt]]}
+   S.push({type:"pg",tag:"Kejadian Saling Lepas",q,o:pgf(cn,tt,ds)});}
+  // 18. PG – peluang gabungan dua kejadian tidak saling lepas
+  {let q,cn,tt,ds;
+   if(R()<.5){const E=pc([["kartu As","kartu hati",4,13,1],["kartu As","kartu berwarna merah",4,26,2],["kartu As","kartu berwarna hitam",4,26,2],["kartu King","kartu sekop",4,13,1],["kartu Queen","kartu wajik",4,13,1],["kartu bergambar (Jack, Queen, King)","kartu hati",12,13,3]]);
+     cn=E[2]+E[3]-E[4];tt=52;
+     q=`Sebuah kartu diambil secara acak dari satu set kartu bridge (52 kartu). Peluang terambilnya ${E[0]} atau ${E[1]} adalah …`;ds=[[E[2]+E[3],52],[E[2]+E[3]+E[4],52],[E[2]*E[3],52],[E[3],52]]}
+   else{const N=pc([36,40,45,48]);let a,b,c;
+     do{c=ri(3,8);a=ri(12,20);b=ri(10,18)}while(a-c<2||b-c<2||a+b-c>N-3);
+     tt=N;cn=a+b-c;
+     q=`Dalam sebuah kelas yang terdiri dari ${N} siswa, ada ${a} siswa yang suka olahraga, ${b} siswa yang suka seni, dan ${c} siswa yang suka keduanya. Jika dipilih satu siswa secara acak, peluang siswa yang terpilih suka olahraga atau seni adalah …`;
+     ds=[[a+b,N],[a+b+c,N],[N-cn,N],[a-c+b-c,N]]}
+   S.push({type:"pg",tag:"Kejadian Tidak Saling Lepas",q,o:pgf(cn,tt,ds)});}
+  // 19. PG – kejadian saling bebas dan bersyarat (dengan / tanpa pengembalian)
+  {const r=ri(3,7),h=ri(3,8),T=r+h,[c1,c2]=pc([["merah","hitam"],["biru","putih"],["kuning","hijau"]]),
+    F=[[r*h,T*T],[r*r,T*T],[r*h,T*(T-1)],[r*(r-1),T*(T-1)]],ty=ri(0,3),
+    N=["dengan pengembalian","tanpa pengembalian"][ty<2?0:1],
+    W=[`bola ${c1} kemudian bola ${c2}`,`kedua bola berwarna ${c1}`,`bola ${c1} kemudian bola ${c2}`,`kedua bola berwarna ${c1}`][ty];
+   S.push({type:"pg",tag:"Kejadian Saling Bebas dan Bersyarat",
+    q:`Sebuah kantong berisi ${r} bola ${c1} dan ${h} bola ${c2}. Diambil dua bola satu demi satu ${N}. Peluang terambilnya ${W} adalah …`,
+    o:pgf(F[ty][0],F[ty][1],F.filter((x,i)=>i!=ty).concat([[h*h,T*T],[h*(h-1),T*(T-1)]]))});}
+  // 20. PG – peluang dengan kombinasi (pengambilan sekaligus)
+  {const r=ri(4,7),h=ri(4,8),T=r+h,k=pc([2,3]),a=ri(1,k-1),b=k-a,[c1,c2]=pc([["merah","putih"],["merah","hitam"],["biru","kuning"]]),
+    cn=Cm(r,a)*Cm(h,b),tt=Cm(T,k);
+   S.push({type:"pg",tag:"Peluang dengan Kombinasi",
+    q:`Dalam sebuah kotak terdapat ${r} bola ${c1} dan ${h} bola ${c2}. Jika diambil ${k} bola sekaligus, peluang terambilnya ${a} bola ${c1} dan ${b} bola ${c2} adalah …`,
+    o:pgf(cn,tt,[[Cm(r,b)*Cm(h,a),tt],[cn,Pm(T,k)],[cn,Math.pow(T,k)],[Cm(r,a)+Cm(h,b),tt],[cn,tt+T]])});}
   return S.map((s,i)=>({...s,id:"S"+(i+1)}));
 }
 function pgo(c,d,f=num,st){ // c = jawaban benar, d = calon pengecoh, f = format tampilan, st = langkah pengisi bila pengecoh kurang
@@ -234,7 +346,7 @@ const $=s=>document.querySelector(s), app=$("#app");
 function rng(seed){return()=>{seed|=0;seed=seed+0x6D2B79F5|0;let t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
 function shuf(a,r){a=[...a];for(let i=a.length-1;i>0;i--){const j=Math.floor(r()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-const KEY="aas_ganjil_2627_bilangan_deret_v1";
+const KEY="aas_ganjil_2627_v1";
 let st=null, qs=[], timerId=null, lastV=0, done=false, grace=0;
 const mv=()=>(st&&st.mv)||MAXV;
 const tanya=m=>{const r=confirm(m);grace=Date.now()+2500;return r}; // dialog bawaan browser membuat layar 'blur' sesaat, bukan pelanggaran
@@ -266,12 +378,13 @@ window.addEventListener("blur",()=>{if(!document.hidden)setTimeout(()=>{if(!docu
 
 /* ================= TAMPILAN ================= */
 function gambar(){
-  // kiri: batang + kurva eksponen (Barisan & Deret) · kanan: simbol xⁿ, √, log (Bilangan)
-  const H=[14,26,38,50,62,74,86],E=[8,13,20,31,48,72,104],pts=E.map((hh,i)=>[22+i*22,112-hh]);
+  // kiri: histogram + poligon frekuensi (Statistika) · kanan: dua dadu (Peluang)
+  const H=[16,32,52,76,60,38,18],pts=H.map((hh,i)=>[22+i*22,112-hh]);
   const bar=H.map((hh,i)=>`<rect class="bt" x="${12+i*22}" y="${112-hh}" width="19" height="${hh}" rx="3" fill="url(#gb)" style="animation-delay:${0.6+i*0.12}s"/>`).join("");
   const dot=pts.map(([x,y],i)=>`<circle class="dot" cx="${x}" cy="${y}" r="4" fill="#fff" stroke="#fbbf24" stroke-width="2" style="animation-delay:${1.4+i*0.25}s"/>`).join("");
-  const sy=(t,x,y,z,d)=>`<text class="dd" x="${x}" y="${y}" font-size="${z}" fill="#fde68a" font-family="Georgia,serif" font-style="italic" style="animation-delay:${d}s">${t}</text>`;
-  return `<svg class="gbr" viewBox="0 0 330 156" role="img" aria-label="Grafik barisan dan kurva eksponen serta simbol pangkat, akar, dan logaritma">
+  const pip=(cx,cy)=>`<circle cx="${cx}" cy="${cy}" r="4.2" fill="#0f3f3a"/>`;
+  const die=(x,y,rot,p,d)=>`<g transform="translate(${x} ${y}) rotate(${rot} 26 26)"><g class="dd" style="animation-delay:${d}s"><rect width="52" height="52" rx="11" fill="#fffbeb" stroke="#fbbf24" stroke-width="2.5"/>${p.map(q=>pip(q[0],q[1])).join("")}</g></g>`;
+  return `<svg class="gbr" viewBox="0 0 330 156" role="img" aria-label="Histogram dan poligon frekuensi serta dua buah dadu">
    <defs><linearGradient id="gb" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".95"/><stop offset="1" stop-color="#fff" stop-opacity=".3"/></linearGradient>
    <filter id="gl"><feGaussianBlur stdDeviation="2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
    <line x1="6" y1="114" x2="172" y2="114" stroke="#fff" stroke-opacity=".55" stroke-width="2" stroke-linecap="round"/>
@@ -279,15 +392,16 @@ function gambar(){
    <path class="kurva" pathLength="1" d="M${pts.map(p=>p.join(",")).join(" L")}" fill="none" stroke="#fbbf24" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" filter="url(#gl)"/>
    ${dot}
    <line x1="186" y1="114" x2="324" y2="114" stroke="#fff" stroke-opacity=".55" stroke-width="2" stroke-linecap="round"/>
-   ${sy(`x<tspan dy="-14" font-size="22">n</tspan>`,192,66,42,1.6)}${sy("√",262,62,46,1.9)}${sy("log",214,106,30,2.2)}
-   <text class="tx" x="8" y="132" font-size="11.5" fill="#fff" fill-opacity=".92" font-family="Georgia,serif" font-style="italic">U<tspan dy="3" font-size="8">n</tspan><tspan dy="-3"> = a + (n−1)b , a·r</tspan><tspan dy="-4" font-size="8">n−1</tspan></text>
-   <text class="tx" x="8" y="148" font-size="10" fill="#fff" fill-opacity=".7" font-family="system-ui,sans-serif" letter-spacing=".1em">BARISAN &amp; DERET</text>
-   <text class="tx" x="188" y="132" font-size="11.5" fill="#fde68a" font-family="Georgia,serif" font-style="italic"><tspan dy="-4" font-size="8">a</tspan><tspan dy="4">log b = c ⇔ a</tspan><tspan dy="-4" font-size="8">c</tspan><tspan dy="4"> = b</tspan></text>
-   <text class="tx" x="188" y="148" font-size="10" fill="#fde68a" fill-opacity=".85" font-family="system-ui,sans-serif" letter-spacing=".1em">EKSPONEN &amp; LOGARITMA</text>
+   ${die(196,34,-12,[[13,13],[39,13],[26,26],[13,39],[39,39]],1.6)}
+   ${die(256,50,14,[[13,13],[39,39],[26,26]],1.9)}
+   <text class="tx" x="8" y="132" font-size="11.5" fill="#fff" fill-opacity=".92" font-family="Georgia,serif" font-style="italic">x̄ , Me , Mo , Q , S</text>
+   <text class="tx" x="8" y="148" font-size="10" fill="#fff" fill-opacity=".7" font-family="system-ui,sans-serif" letter-spacing=".1em">STATISTIKA</text>
+   <text class="tx" x="188" y="132" font-size="11.5" fill="#fde68a" font-family="Georgia,serif" font-style="italic">P(A) = n(A) / n(S)</text>
+   <text class="tx" x="188" y="148" font-size="10" fill="#fde68a" fill-opacity=".85" font-family="system-ui,sans-serif" letter-spacing=".1em">PELUANG</text>
   </svg>`;
 }
 function depan(msg){
-  const sim=["Σ","√","log","aⁿ","Uₙ","Sₙ","∞","%","r","b","a","Rp","n","x","Σ","√"];
+  const sim=["Σ","x̄","Me","Mo","S","Q","%","f","n!","P(A)","nCr","nPr","∪","∩","D","P"];
   app.innerHTML=`<div class="hero"><div id="fl"></div><div class="wrap hc"><div class="card cover">
     <div class="top">UJIAN DARING · LAYAR PENUH</div>
     <div class="body">
@@ -296,7 +410,7 @@ function depan(msg){
     <div class="thn">Tahun Pelajaran ${CONFIG.TAHUN}</div>
     <div class="mp">${CONFIG.MAPEL} · Kelas ${CONFIG.KELAS}</div>
     ${gambar()}
-    <div class="mat"><span>Bilangan</span><span>Barisan &amp; Deret</span></div>
+    <div class="mat"><span>Statistika</span><span>Peluang</span></div>
     <div class="info"><span>📝 ${CONFIG.JUMLAH_SOAL} soal</span><span id="chd">⏱ ${DUR} menit</span>${CONFIG.KESEMPATAN>1?`<span>🔁 ${CONFIG.KESEMPATAN} kesempatan · nilai terbesar diambil</span>`:""}</div>
     <ul class="rules"><li>Ujian berjalan dalam <b>layar penuh</b>.</li>
     <li>Dilarang pindah tab/aplikasi, membuka aplikasi lain, atau menyalin soal.</li>
@@ -378,9 +492,9 @@ function tampil(i){
   chips();window.scrollTo(0,0);
 }
 function isi(q){
-  if(q.type=="pg")return q.o.map((o,j)=>`<label class="opt"><input type="radio" name="${q.id}" data-q="${q.id}" value="${j}"><span>${o.t}</span></label>`).join("");
-  if(q.type=="pk")return q.o.map((o,j)=>`<label class="opt"><input type="checkbox" data-q="${q.id}" value="${j}"><span>${o.t}</span></label>`).join("");
-  if(q.type=="bs")return `<table><tr><th>Pernyataan</th><th>Benar</th><th>Salah</th></tr>`+q.o.map((o,j)=>`<tr><td>${o.t}</td><td class="c"><input type="radio" name="${q.id}_${j}" data-q="${q.id}" data-j="${j}" value="1"></td><td class="c"><input type="radio" name="${q.id}_${j}" data-q="${q.id}" data-j="${j}" value="0"></td></tr>`).join("")+`</table>`;
+  if(q.type=="pg")return q.o.map((o,j)=>`<label class="opt"><input type="radio" name="${q.id}" data-q="${q.id}" value="${j}"><span>${esc(o.t)}</span></label>`).join("");
+  if(q.type=="pk")return q.o.map((o,j)=>`<label class="opt"><input type="checkbox" data-q="${q.id}" value="${j}"><span>${esc(o.t)}</span></label>`).join("");
+  if(q.type=="bs")return `<table><tr><th>Pernyataan</th><th>Benar</th><th>Salah</th></tr>`+q.o.map((o,j)=>`<tr><td>${esc(o.t)}</td><td class="c"><input type="radio" name="${q.id}_${j}" data-q="${q.id}" data-j="${j}" value="1"></td><td class="c"><input type="radio" name="${q.id}_${j}" data-q="${q.id}" data-j="${j}" value="0"></td></tr>`).join("")+`</table>`;
   return `<input type="number" inputmode="decimal" data-q="${q.id}" placeholder="Tulis jawaban (angka)">`;
 }
 function ambil(){
